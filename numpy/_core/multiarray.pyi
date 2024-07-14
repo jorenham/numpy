@@ -4,6 +4,7 @@ from collections.abc import Sequence, Callable, Iterable
 from typing import (
     Literal as L,
     Any,
+    TypeAlias,
     overload,
     TypeVar,
     SupportsIndex,
@@ -183,7 +184,7 @@ _ArrayType_co = TypeVar(
 )
 
 # Valid time units
-_UnitKind = L[
+_UnitKind: TypeAlias = L[
     "Y",
     "M",
     "D",
@@ -197,7 +198,7 @@ _UnitKind = L[
     "fs",
     "as",
 ]
-_RollKind = L[  # `raise` is deliberately excluded
+_RollKind: TypeAlias = L[  # `raise` is deliberately excluded
     "nat",
     "forward",
     "following",
@@ -1112,7 +1113,7 @@ def compare_chararrays(
 
 def add_docstring(obj: Callable[..., Any], docstring: str, /) -> None: ...
 
-_GetItemKeys = L[
+_GetItemKeys: TypeAlias = L[
     "C", "CONTIGUOUS", "C_CONTIGUOUS",
     "F", "FORTRAN", "F_CONTIGUOUS",
     "W", "WRITEABLE",
@@ -1125,7 +1126,7 @@ _GetItemKeys = L[
     "FNC",
     "FORC",
 ]
-_SetItemKeys = L[
+_SetItemKeys: TypeAlias = L[
     "A", "ALIGNED",
     "W", "WRITEABLE",
     "X", "WRITEBACKIFCOPY",
