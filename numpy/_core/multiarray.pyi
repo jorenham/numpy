@@ -1,5 +1,3 @@
-# TODO: Sort out any and all missing functions in this namespace
-import builtins
 import os
 import datetime as dt
 from collections.abc import Sequence, Callable, Iterable
@@ -79,6 +77,101 @@ from numpy._typing import (
     _TD64Like_co,
 )
 
+__all__ = [
+    '_ARRAY_API',
+    'ALLOW_THREADS',
+    'BUFSIZE',
+    'CLIP',
+    'DATETIMEUNITS',
+    'ITEM_HASOBJECT',
+    'ITEM_IS_POINTER',
+    'LIST_PICKLE',
+    'MAXDIMS',
+    'MAY_SHARE_BOUNDS',
+    'MAY_SHARE_EXACT',
+    'NEEDS_INIT',
+    'NEEDS_PYAPI',
+    'RAISE',
+    'USE_GETITEM',
+    'USE_SETITEM',
+    'WRAP',
+    '_flagdict',
+    'from_dlpack',
+    '_place',
+    '_reconstruct',
+    '_vec_string',
+    '_monotonicity',
+    'add_docstring',
+    'arange',
+    'array',
+    'asarray',
+    'asanyarray',
+    'ascontiguousarray',
+    'asfortranarray',
+    'bincount',
+    'broadcast',
+    'busday_count',
+    'busday_offset',
+    'busdaycalendar',
+    'can_cast',
+    'compare_chararrays',
+    'concatenate',
+    'copyto',
+    'correlate',
+    'correlate2',
+    'count_nonzero',
+    'c_einsum',
+    'datetime_as_string',
+    'datetime_data',
+    'dot',
+    'dragon4_positional',
+    'dragon4_scientific',
+    'dtype',
+    'empty',
+    'empty_like',
+    'error',
+    'flagsobj',
+    'flatiter',
+    'format_longfloat',
+    'frombuffer',
+    'fromfile',
+    'fromiter',
+    'fromstring',
+    'get_handler_name',
+    'get_handler_version',
+    'inner',
+    'interp',
+    'interp_complex',
+    'is_busday',
+    'lexsort',
+    'matmul',
+    'vecdot',
+    'may_share_memory',
+    'min_scalar_type',
+    'ndarray',
+    'nditer',
+    'nested_iters',
+    'normalize_axis_index',
+    'packbits',
+    'promote_types',
+    'putmask',
+    'ravel_multi_index',
+    'result_type',
+    'scalar',
+    'set_datetimeparse_function',
+    'set_legacy_print_mode',
+    'set_typeDict',
+    'shares_memory',
+    'typeinfo',
+    'unpackbits',
+    'unravel_index',
+    'vdot',
+    'where',
+    'zeros',
+    '_get_promotion_state',
+    '_set_promotion_state',
+]
+
 _T_co = TypeVar("_T_co", covariant=True)
 _T_contra = TypeVar("_T_contra", contravariant=True)
 _SCT = TypeVar("_SCT", bound=generic)
@@ -121,17 +214,19 @@ class _SupportsLenAndGetItem(Protocol[_T_contra, _T_co]):
 class _SupportsArray(Protocol[_ArrayType_co]):
     def __array__(self, /) -> _ArrayType_co: ...
 
-__all__: list[str]
+ALLOW_THREADS: Final[L[0, 1]]  # system-specific
+BUFSIZE: Final[L[8192]]
 
-ALLOW_THREADS: Final[int]  # 0 or 1 (system-specific)
-BUFSIZE: L[8192]
-CLIP: L[0]
-WRAP: L[1]
-RAISE: L[2]
-MAXDIMS: L[32]
-MAY_SHARE_BOUNDS: L[0]
-MAY_SHARE_EXACT: L[-1]
-tracemalloc_domain: L[389047]
+CLIP: Final[L[0]]
+WRAP: Final[L[1]]
+RAISE: Final[L[2]]
+
+MAXDIMS: Final[L[32]]
+
+MAY_SHARE_BOUNDS: Final[L[0]]
+MAY_SHARE_EXACT: Final[L[-1]]
+
+tracemalloc_domain: Final[L[389047]]
 
 @overload
 def empty_like(
