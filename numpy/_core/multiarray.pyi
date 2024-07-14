@@ -775,7 +775,8 @@ def fromstring(
 ) -> NDArray[Any]: ...
 
 def frompyfunc(
-    func: Callable[..., Any], /,
+    func: Callable[..., Any],
+    /,
     nin: SupportsIndex,
     nout: SupportsIndex,
     *,
@@ -942,8 +943,8 @@ def arange(
 ) -> NDArray[_SCT]: ...
 @overload
 def arange(
-    stop: Any, /,
-    *,
+    stop: Any,
+    /, *,
     dtype: DTypeLike,
     device: None | L["cpu"] = ...,
     like: None | _SupportsArrayFunc = ...,
