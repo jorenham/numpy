@@ -98,7 +98,7 @@ from .numeric import (
 )
 
 if sys.version_info >= (3, 11):
-    from types import LiteralString
+    from typing import LiteralString
 else:
     LiteralString: TypeAlias = str
 
@@ -238,7 +238,6 @@ _RollKind: TypeAlias = L[  # `raise` is deliberately excluded
     "modifiedpreceding",
 ]
 
-@final
 class _SupportsLenAndGetItem(Protocol[_T_contra, _T_co]):
     def __len__(self) -> int: ...
     def __getitem__(self, key: _T_contra, /) -> _T_co: ...
