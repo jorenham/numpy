@@ -3225,6 +3225,8 @@ class bool(generic):
     ) -> builtins.bool: ...
     def tolist(self) -> builtins.bool: ...
     @property
+    def dtype(self) -> dtypes.BoolDType: ...  # type: ignore[override]
+    @property
     def real(self) -> Self: ...
     @property
     def imag(self) -> Self: ...
@@ -3264,7 +3266,8 @@ class bool(generic):
     __gt__: _ComparisonOpGT[_NumberLike_co, _ArrayLikeNumber_co]
     __ge__: _ComparisonOpGE[_NumberLike_co, _ArrayLikeNumber_co]
 
-bool_: TypeAlias = bool
+# NOTE: This should not be a `TypeAlias` -- it's a runtime type constructor
+bool_: Final = bool
 
 _StringType = TypeVar("_StringType", bound=str | bytes)
 _ShapeType = TypeVar("_ShapeType", bound=Any)
@@ -3297,6 +3300,8 @@ class object_(generic):
     @overload
     def __new__(cls, value: Any = ..., /) -> object | NDArray[object_]: ...
 
+    @property
+    def dtype(self) -> dtypes.ObjectDType: ...  # type: ignore[override]
     @property
     def real(self) -> Self: ...
     @property
@@ -3337,6 +3342,8 @@ class datetime64(generic):
         format: _CharLike_co | tuple[_CharLike_co, _IntLike_co],
         /,
     ) -> None: ...
+    @property
+    def dtype(self) -> dtypes.DateTime64DType: ...  # type: ignore[override]
     def __add__(self, other: _TD64Like_co, /) -> datetime64: ...
     def __radd__(self, other: _TD64Like_co, /) -> datetime64: ...
     @overload
@@ -3349,6 +3356,48 @@ class datetime64(generic):
     __gt__: _ComparisonOpGT[datetime64, _ArrayLikeDT64_co]
     __ge__: _ComparisonOpGE[datetime64, _ArrayLikeDT64_co]
 
+# TODO: `item`/`tolist` returns either `dt.timedelta` or `int`
+# depending on the unit
+class timedelta64(generic):
+    def __init__(
+        self,
+        value: None | int | _CharLike_co | dt.timedelta | timedelta64 = ...,
+        format: _CharLike_co | tuple[_CharLike_co, _IntLike_co] = ...,
+        /,
+    ) -> None: ...
+    @property
+    def dtype(self) -> dtypes.TimeDelta64DType: ...  # type: ignore[override]
+    @property
+    def numerator(self: _ScalarType) -> _ScalarType: ...
+    @property
+    def denominator(self) -> L[1]: ...
+    # NOTE: Only a limited number of units support conversion
+    # to builtin scalar types: `Y`, `M`, `ns`, `ps`, `fs`, `as`
+    def __int__(self) -> int: ...
+    def __float__(self) -> float: ...
+    def __complex__(self) -> complex: ...
+    def __neg__(self: _ArraySelf) -> _ArraySelf: ...
+    def __pos__(self: _ArraySelf) -> _ArraySelf: ...
+    def __abs__(self: _ArraySelf) -> _ArraySelf: ...
+    def __add__(self, other: _TD64Like_co, /) -> timedelta64: ...
+    def __radd__(self, other: _TD64Like_co, /) -> timedelta64: ...
+    def __sub__(self, other: _TD64Like_co, /) -> timedelta64: ...
+    def __rsub__(self, other: _TD64Like_co, /) -> timedelta64: ...
+    def __mul__(self, other: _FloatLike_co, /) -> timedelta64: ...
+    def __rmul__(self, other: _FloatLike_co, /) -> timedelta64: ...
+    __truediv__: _TD64Div[float64]
+    __floordiv__: _TD64Div[int64]
+    def __rtruediv__(self, other: timedelta64, /) -> float64: ...
+    def __rfloordiv__(self, other: timedelta64, /) -> int64: ...
+    def __mod__(self, other: timedelta64, /) -> timedelta64: ...
+    def __rmod__(self, other: timedelta64, /) -> timedelta64: ...
+    def __divmod__(self, other: timedelta64, /) -> tuple[int64, timedelta64]: ...
+    def __rdivmod__(self, other: timedelta64, /) -> tuple[int64, timedelta64]: ...
+    __lt__: _ComparisonOpLT[_TD64Like_co, _ArrayLikeTD64_co]
+    __le__: _ComparisonOpLE[_TD64Like_co, _ArrayLikeTD64_co]
+    __gt__: _ComparisonOpGT[_TD64Like_co, _ArrayLikeTD64_co]
+    __ge__: _ComparisonOpGE[_TD64Like_co, _ArrayLikeTD64_co]
+
 _IntValue: TypeAlias = SupportsInt | _CharLike_co | SupportsIndex
 _FloatValue: TypeAlias = None | _CharLike_co | SupportsFloat | SupportsIndex
 _ComplexValue: TypeAlias = (
@@ -3359,6 +3408,9 @@ _ComplexValue: TypeAlias = (
     | SupportsIndex
     | complex  # `complex` is not a subtype of `SupportsComplex`
 )
+
+_IntType = TypeVar("_IntType", bound=integer[Any])
+_FloatType = TypeVar('_FloatType', bound=floating[Any])
 
 class integer(number[_NBit1]):  # type: ignore
     @property
@@ -3423,62 +3475,59 @@ class signedinteger(integer[_NBit1]):
     __divmod__: _SignedIntDivMod[_NBit1]
     __rdivmod__: _SignedIntDivMod[_NBit1]
 
-int8 = signedinteger[_8Bit]
-int16 = signedinteger[_16Bit]
-int32 = signedinteger[_32Bit]
-int64 = signedinteger[_64Bit]
+class int8(signedinteger[_8Bit]):
+    @property
+    def itemsize(self) -> L[1]: ...
+    @property
+    def dtype(self) -> dtypes.Int8DType: ...  # type: ignore[override]
 
-byte = signedinteger[_NBitByte]
-short = signedinteger[_NBitShort]
-intc = signedinteger[_NBitIntC]
-intp = signedinteger[_NBitIntP]
+class int16(signedinteger[_16Bit]):
+    @property
+    def itemsize(self) -> L[2]: ...
+    @property
+    def dtype(self) -> dtypes.Int16DType: ...  # type: ignore[override]
+
+class int32(signedinteger[_32Bit]):
+    @property
+    def itemsize(self) -> L[4]: ...
+    @property
+    def dtype(self) -> dtypes.Int32DType: ...  # type: ignore[override]
+
+class int64(signedinteger[_64Bit]):
+    @property
+    def itemsize(self) -> L[8]: ...
+    @property
+    def dtype(self) -> dtypes.Int64DType: ...  # type: ignore[override]
+
+byte: Final = int8
+short: Final = int16
+intc: Final = int32
+# NOTE: this should neither be `Final` nor a `TypeAlias`
+intp = int32 | int64
 int_ = intp
-long = signedinteger[_NBitLong]
-longlong = signedinteger[_NBitLongLong]
 
-# TODO: `item`/`tolist` returns either `dt.timedelta` or `int`
-# depending on the unit
-class timedelta64(generic):
-    def __init__(
-        self,
-        value: None | int | _CharLike_co | dt.timedelta | timedelta64 = ...,
-        format: _CharLike_co | tuple[_CharLike_co, _IntLike_co] = ...,
-        /,
-    ) -> None: ...
+class long(signedinteger[_NBitLong]):
+    @overload
+    def __new__(cls: type[signedinteger[_64Bit]], value: _IntValue = ..., /) -> int64: ...
+    @overload
+    def __new__(cls, value: _IntValue = ..., /) -> Self: ...
     @property
-    def numerator(self) -> Self: ...
+    def itemsize(self) -> L[4, 8]: ...
     @property
-    def denominator(self) -> L[1]: ...
+    def dtype(self) -> dtypes.LongDType: ...  # type: ignore[override]
 
-    # NOTE: Only a limited number of units support conversion
-    # to builtin scalar types: `Y`, `M`, `ns`, `ps`, `fs`, `as`
-    def __int__(self) -> int: ...
-    def __float__(self) -> float: ...
-    def __complex__(self) -> complex: ...
-    def __neg__(self) -> Self: ...
-    def __pos__(self) -> Self: ...
-    def __abs__(self) -> Self: ...
-    def __add__(self, other: _TD64Like_co, /) -> timedelta64: ...
-    def __radd__(self, other: _TD64Like_co, /) -> timedelta64: ...
-    def __sub__(self, other: _TD64Like_co, /) -> timedelta64: ...
-    def __rsub__(self, other: _TD64Like_co, /) -> timedelta64: ...
-    def __mul__(self, other: _FloatLike_co, /) -> timedelta64: ...
-    def __rmul__(self, other: _FloatLike_co, /) -> timedelta64: ...
-    __truediv__: _TD64Div[float64]
-    __floordiv__: _TD64Div[int64]
-    def __rtruediv__(self, other: timedelta64, /) -> float64: ...
-    def __rfloordiv__(self, other: timedelta64, /) -> int64: ...
-    def __mod__(self, other: timedelta64, /) -> timedelta64: ...
-    def __rmod__(self, other: timedelta64, /) -> timedelta64: ...
-    def __divmod__(self, other: timedelta64, /) -> tuple[int64, timedelta64]: ...
-    def __rdivmod__(self, other: timedelta64, /) -> tuple[int64, timedelta64]: ...
-    __lt__: _ComparisonOpLT[_TD64Like_co, _ArrayLikeTD64_co]
-    __le__: _ComparisonOpLE[_TD64Like_co, _ArrayLikeTD64_co]
-    __gt__: _ComparisonOpGT[_TD64Like_co, _ArrayLikeTD64_co]
-    __ge__: _ComparisonOpGE[_TD64Like_co, _ArrayLikeTD64_co]
+class longlong(signedinteger[_NBitLongLong]):
+    @overload
+    def __new__(cls: type[signedinteger[_64Bit]], value: _IntValue = ..., /) -> int64: ...
+    @overload
+    def __new__(cls, value: _IntValue = ..., /) -> Self: ...
+    @property
+    def itemsize(self) -> L[8]: ...
+    @property
+    def dtype(self) -> dtypes.LongLongDType: ...  # type: ignore[override]
+
 
 class unsignedinteger(integer[_NBit1]):
-    # NOTE: `uint64 + signedinteger -> float64`
     def __init__(self, value: _IntValue = ..., /) -> None: ...
     __add__: _UnsignedIntOp[_NBit1]
     __radd__: _UnsignedIntOp[_NBit1]
@@ -3505,23 +3554,61 @@ class unsignedinteger(integer[_NBit1]):
     __divmod__: _UnsignedIntDivMod[_NBit1]
     __rdivmod__: _UnsignedIntDivMod[_NBit1]
 
-uint8: TypeAlias = unsignedinteger[_8Bit]
-uint16: TypeAlias = unsignedinteger[_16Bit]
-uint32: TypeAlias = unsignedinteger[_32Bit]
-uint64: TypeAlias = unsignedinteger[_64Bit]
+class uint8(unsignedinteger[_8Bit]):
+    @property
+    def itemsize(self) -> L[1]: ...
+    @property
+    def dtype(self, /) -> dtypes.UInt8DType: ...  # type: ignore[override]
 
-ubyte: TypeAlias = unsignedinteger[_NBitByte]
-ushort: TypeAlias = unsignedinteger[_NBitShort]
-uintc: TypeAlias = unsignedinteger[_NBitIntC]
-uintp: TypeAlias = unsignedinteger[_NBitIntP]
-uint: TypeAlias = uintp
-ulong: TypeAlias = unsignedinteger[_NBitLong]
-ulonglong: TypeAlias = unsignedinteger[_NBitLongLong]
+class uint16(unsignedinteger[_16Bit]):
+    @property
+    def itemsize(self) -> L[2]: ...
+    @property
+    def dtype(self) -> dtypes.UInt16DType: ...  # type: ignore[override]
 
-class inexact(number[_NBit1]):  # type: ignore
-    def __getnewargs__(self: inexact[_64Bit]) -> tuple[float, ...]: ...
+class uint32(unsignedinteger[_32Bit]):
+    @property
+    def itemsize(self) -> L[4]: ...
+    @property
+    def dtype(self) -> dtypes.UInt32DType: ...  # type: ignore[override]
 
-_IntType = TypeVar("_IntType", bound=integer[Any])
+class uint64(unsignedinteger[_64Bit]):
+    # TODO: `uint64 + signedinteger -> float64`
+    @property
+    def itemsize(self) -> L[8]: ...
+    @property
+    def dtype(self) -> dtypes.UInt64DType: ...  # type: ignore[override]
+
+ubyte: Final = uint8
+ushort: Final = uint16
+uintc: Final = uint32
+# NOTE: This should neither be `Final` nor a `TypeAlias`.
+uintp = uint32 | uint64
+uint = uintp
+
+class ulong(unsignedinteger[_NBitLong]):
+    @overload
+    def __new__(cls: type[unsignedinteger[_32Bit]], value: _IntValue = ..., /) -> Self: ...
+    @overload
+    def __new__(cls: type[unsignedinteger[_64Bit]], value: _IntValue = ..., /) -> uint64: ...
+    @property
+    def itemsize(self) -> L[4, 8]: ...
+    @property
+    def dtype(self) -> dtypes.ULongDType: ...  # type: ignore[override]
+
+class ulonglong(unsignedinteger[_NBitLongLong]):
+    @overload
+    def __new__(cls: type[unsignedinteger[_64Bit]], value: _IntValue = ..., /) -> uint64: ...
+    @overload
+    def __new__(cls, value: _IntValue = ..., /) -> Self: ...
+    @property
+    def itemsize(self) -> L[8]: ...
+    @property
+    def dtype(self) -> dtypes.ULongLongDType: ...  # type: ignore[override]
+
+
+class inexact(number[_NBit1]):
+    pass
 
 class floating(inexact[_NBit1]):
     def __init__(self, value: _FloatValue = ..., /) -> None: ...
@@ -3531,15 +3618,7 @@ class floating(inexact[_NBit1]):
     ) -> float: ...
     def tolist(self) -> float: ...
     def is_integer(self) -> builtins.bool: ...
-    def hex(self: float64) -> str: ...
-    @classmethod
-    def fromhex(cls: type[float64], string: str, /) -> float64: ...
     def as_integer_ratio(self) -> tuple[int, int]: ...
-    def __ceil__(self: float64) -> int: ...
-    def __floor__(self: float64) -> int: ...
-    def __trunc__(self: float64) -> int: ...
-    def __getnewargs__(self: float64) -> tuple[float]: ...
-    def __getformat__(self: float64, typestr: L["double", "float"], /) -> str: ...
     @overload
     def __round__(self, ndigits: None = ..., /) -> int: ...
     @overload
@@ -3561,21 +3640,45 @@ class floating(inexact[_NBit1]):
     __divmod__: _FloatDivMod[_NBit1]
     __rdivmod__: _FloatDivMod[_NBit1]
 
-float16: TypeAlias = floating[_16Bit]
-float32: TypeAlias = floating[_32Bit]
-float64: TypeAlias = floating[_64Bit]
+class float16(floating[_16Bit]):
+    @property
+    def itemsize(self) -> L[2]: ...
+    @property
+    def dtype(self) -> dtypes.Float16DType: ...  # type: ignore[override]
 
-half: TypeAlias = floating[_NBitHalf]
-single: TypeAlias = floating[_NBitSingle]
-double: TypeAlias = floating[_NBitDouble]
-longdouble: TypeAlias = floating[_NBitLongDouble]
+class float32(floating[_32Bit]):
+    @property
+    def itemsize(self) -> L[4]: ...
+    @property
+    def dtype(self) -> dtypes.Float32DType: ...  # type: ignore[override]
+
+class float64(floating[_64Bit], float):
+    @property
+    def itemsize(self) -> L[8]: ...
+    @property
+    def dtype(self) -> dtypes.Float64DType: ...  # type: ignore[override]
+    # override of `builtins.float.__getformat__`
+    def __getformat__(self, typestr: L["double", "float"], /) -> str: ...
+
+half = float16
+single = float32
+double = float64
+
+class longdouble(floating[_NBitLongDouble]):
+    @property
+    def itemsize(self) -> L[8, 12, 16]: ...
+    @property
+    def dtype(self) -> dtypes.LongDoubleDType: ...  # type: ignore[override]
 
 # The main reason for `complexfloating` having two typevars is cosmetic.
 # It is used to clarify why `complex128`s precision is `_64Bit`, the latter
 # describing the two 64 bit floats representing its real and imaginary component
 
 class complexfloating(inexact[_NBit1], Generic[_NBit1, _NBit2]):
+    @overload
     def __init__(self, value: _ComplexValue = ..., /) -> None: ...
+    @overload
+    def __init__(self, real: _FloatValue = ..., imag: _FloatValue = ..., /) -> None: ...
     def item(
         self, args: L[0] | tuple[()] | tuple[L[0]] = ..., /,
     ) -> complex: ...
@@ -3585,7 +3688,6 @@ class complexfloating(inexact[_NBit1], Generic[_NBit1, _NBit2]):
     @property
     def imag(self) -> floating[_NBit2]: ...  # type: ignore[override]
     def __abs__(self) -> floating[_NBit1]: ...  # type: ignore[override]
-    def __getnewargs__(self: complex128) -> tuple[float, float]: ...
     # NOTE: Deprecated
     # def __round__(self, ndigits=...): ...
     __add__: _ComplexOp[_NBit1]
@@ -3599,14 +3701,44 @@ class complexfloating(inexact[_NBit1], Generic[_NBit1, _NBit2]):
     __pow__: _ComplexOp[_NBit1]
     __rpow__: _ComplexOp[_NBit1]
 
-complex64: TypeAlias = complexfloating[_32Bit, _32Bit]
-complex128: TypeAlias = complexfloating[_64Bit, _64Bit]
+class complex64(complexfloating[_32Bit, _32Bit]):
+    @property
+    def itemsize(self) -> L[8]: ...
+    @property
+    def dtype(self) -> dtypes.Complex64DType: ...  # type: ignore[override]
+    @property
+    def real(self) -> float32: ...
+    @property
+    def imag(self) -> float32: ...
+    def __abs__(self) -> float32: ...
 
-csingle: TypeAlias = complexfloating[_NBitSingle, _NBitSingle]
-cdouble: TypeAlias = complexfloating[_NBitDouble, _NBitDouble]
-clongdouble: TypeAlias = complexfloating[_NBitLongDouble, _NBitLongDouble]
+class complex128(complexfloating[_64Bit, _64Bit], complex):
+    @property
+    def itemsize(self) -> L[16]: ...
+    @property
+    def dtype(self) -> dtypes.Complex128DType: ...  # type: ignore[override]
+    @property
+    def real(self) -> float64: ...
+    @property
+    def imag(self) -> float64: ...
+    def __abs__(self) -> float64: ...
 
-class flexible(generic): ...  # type: ignore
+class clongdouble(complexfloating[_NBitLongDouble, _NBitLongDouble]):
+    @property
+    def itemsize(self) -> L[16, 24, 32]: ...
+    @property
+    def dtype(self) -> dtypes.CLongDoubleDType: ...  # type: ignore[override]
+    @property
+    def real(self) -> longdouble: ...
+    @property
+    def imag(self) -> longdouble: ...
+    def __abs__(self) -> longdouble: ...
+
+csingle: Final = complex64
+cdouble: Final = complex128
+
+class flexible(generic):
+    pass
 
 # TODO: `item`/`tolist` returns either `bytes` or `tuple`
 # depending on whether or not it's used as an opaque bytes sequence
@@ -3616,6 +3748,8 @@ class void(flexible):
     def __init__(self, value: _IntLike_co | bytes, /, dtype : None = ...) -> None: ...
     @overload
     def __init__(self, value: Any, /, dtype: _DTypeLikeVoid) -> None: ...
+    @property
+    def dtype(self) -> dtypes.VoidDType[Any]: ...  # type: ignore[override]
     @property
     def real(self) -> Self: ...
     @property
@@ -3652,6 +3786,8 @@ class bytes_(character, bytes):
         self, args: L[0] | tuple[()] | tuple[L[0]] = ..., /,
     ) -> bytes: ...
     def tolist(self) -> bytes: ...
+    @property
+    def dtype(self) -> dtypes.BytesDType[Any]: ...  # type: ignore[override]
 
 class str_(character, str):
     @overload
@@ -3664,6 +3800,8 @@ class str_(character, str):
         self, args: L[0] | tuple[()] | tuple[L[0]] = ..., /,
     ) -> str: ...
     def tolist(self) -> str: ...
+    @property
+    def dtype(self) -> dtypes.StrDType[Any]: ...  # type: ignore[override]
 
 #
 # Constants
