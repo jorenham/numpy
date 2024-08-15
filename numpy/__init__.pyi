@@ -7,7 +7,7 @@ import array as _array
 import datetime as dt
 import enum
 from abc import abstractmethod
-from types import TracebackType, MappingProxyType, GenericAlias
+from types import GetSetDescriptorType, TracebackType, MappingProxyType, GenericAlias
 from contextlib import contextmanager
 
 import numpy as np
@@ -201,6 +201,7 @@ from typing import (
     final,
     ClassVar,
     TypeAlias,
+    type_check_only,
 )
 
 if sys.version_info >= (3, 11):
@@ -1544,13 +1545,42 @@ _ArrayAPIVersion: TypeAlias = L["2021.12", "2022.12", "2023.12"]
 class _SupportsItem(Protocol[_T_co]):
     def item(self, args: Any, /) -> _T_co: ...
 
-class _SupportsReal(Protocol[_T_co]):
-    @property
-    def real(self) -> _T_co: ...
+# a `generic` that isn't `complexfloating`
+_RealScalar: TypeAlias = (
+    bool_
+    | integer[Any]
+    | floating[Any]
+    | flexible
+    | datetime64
+    | timedelta64
+    | object_
+)
+_RealArrayType = TypeVar("_RealArrayType", bound=ndarray[Any, dtype[_RealScalar]])
 
-class _SupportsImag(Protocol[_T_co]):
+# this is the only way to annotate an "overloaded @property" at the moment;
+# as a `getset_descriptor`.
+# @type_check_only
+@final
+class _ndarray_real_imag:
     @property
-    def imag(self) -> _T_co: ...
+    def __name__(self) -> LiteralString: ...
+    @property
+    def __qualname__(self) -> LiteralString: ...  # pyright: ignore[reportIncompatibleVariableOverride]
+    @property
+    def __objclass__(self) -> type[NDArray[Any]]: ...
+    @overload
+    def __get__(self, obj: None, cls: type | None = ..., /) -> _ndarray_real_imag: ...
+    @overload
+    def __get__(self, obj: _RealArrayType, cls: type | None = ..., /) -> _RealArrayType: ...
+    @overload
+    def __get__(
+        self,
+        obj: ndarray[_ShapeType2, dtype[complexfloating[_NBit1, _NBit2]]],
+        cls: type | None = ...,
+        /,
+    ) -> ndarray[_ShapeType2, dtype[np.floating[_NBit1 | _NBit2]]]: ...
+    def __set__(self, obj: object, value: ArrayLike, /) -> None: ...
+
 
 class ndarray(_ArrayOrScalarCommon, Generic[_ShapeType_co, _DType_co]):
     __hash__: ClassVar[None]
@@ -1560,18 +1590,9 @@ class ndarray(_ArrayOrScalarCommon, Generic[_ShapeType_co, _DType_co]):
     def ndim(self) -> int: ...
     @property
     def size(self) -> int: ...
-    @property
-    def real(
-        self: ndarray[_ShapeType_co, dtype[_SupportsReal[_ScalarType]]],  # type: ignore[type-var]
-    ) -> ndarray[_ShapeType_co, _dtype[_ScalarType]]: ...
-    @real.setter
-    def real(self, value: ArrayLike) -> None: ...
-    @property
-    def imag(
-        self: ndarray[_ShapeType_co, dtype[_SupportsImag[_ScalarType]]],  # type: ignore[type-var]
-    ) -> ndarray[_ShapeType_co, _dtype[_ScalarType]]: ...
-    @imag.setter
-    def imag(self, value: ArrayLike) -> None: ...
+    real: ClassVar[_ndarray_real_imag]
+    imag: ClassVar[_ndarray_real_imag]
+
     def __new__(
         cls: type[_ArraySelf],
         shape: _ShapeLike,

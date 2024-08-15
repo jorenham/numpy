@@ -2,6 +2,7 @@ from collections.abc import Container, Iterable
 from typing import (
     Literal as L,
     Any,
+    TypeAlias,
     overload,
     TypeVar,
     Protocol,
@@ -34,6 +35,22 @@ _T_co = TypeVar("_T_co", covariant=True)
 _SCT = TypeVar("_SCT", bound=generic)
 _NBit1 = TypeVar("_NBit1", bound=NBitBase)
 _NBit2 = TypeVar("_NBit2", bound=NBitBase)
+_ShapeType = TypeVar("_ShapeType", bound=tuple[int, ...])
+
+# a `generic` that isn't `complexfloating`
+_RealScalar: TypeAlias = (
+    np.bool
+    | np.integer[Any]
+    | np.floating[Any]
+    | np.flexible
+    | np.datetime64
+    | np.timedelta64
+    | np.object_
+)
+_RealArrayType = TypeVar(
+    "_RealArrayType",
+    bound=np.ndarray[Any, dtype[_RealScalar]],
+)
 
 class _SupportsReal(Protocol[_T_co]):
     @property
@@ -52,10 +69,22 @@ def mintypecode(
 ) -> str: ...
 
 @overload
+def real(
+    val: np.ndarray[_ShapeType, dtype[np.complexfloating[_NBit1, Any]]],
+) -> np.ndarray[_ShapeType, dtype[np.floating[_NBit1]]]: ...
+@overload
+def real(val: _RealArrayType) -> _RealArrayType: ...
+@overload
 def real(val: _SupportsReal[_T]) -> _T: ...
 @overload
 def real(val: ArrayLike) -> NDArray[Any]: ...
 
+@overload
+def imag(
+    val: np.ndarray[_ShapeType, dtype[np.complexfloating[Any, _NBit2]]],
+) -> np.ndarray[_ShapeType, dtype[np.floating[_NBit2]]]: ...
+@overload
+def imag(val: _RealArrayType) -> _RealArrayType: ...
 @overload
 def imag(val: _SupportsImag[_T]) -> _T: ...
 @overload
