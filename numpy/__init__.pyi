@@ -8,7 +8,6 @@ import datetime as dt
 import enum
 from abc import abstractmethod
 from types import EllipsisType, TracebackType, MappingProxyType, GenericAlias
-from contextlib import contextmanager
 from decimal import Decimal
 from fractions import Fraction
 from uuid import UUID
@@ -25,7 +24,6 @@ from numpy._typing import (
     _SupportsArray,
     _NestedSequence,
     _FiniteNestedSequence,
-    _SupportsArray,
     _ArrayLikeBool_co,
     _ArrayLikeUInt_co,
     _ArrayLikeInt_co,
@@ -149,19 +147,16 @@ from numpy._typing._callable import (
     _BoolMod,
     _BoolDivMod,
     _TD64Div,
-    _IntTrueDiv,
     _UnsignedIntOp,
     _UnsignedIntBitOp,
     _UnsignedIntMod,
     _UnsignedIntDivMod,
     _SignedIntOp,
-    _SignedIntBitOp,
     _SignedIntMod,
     _SignedIntDivMod,
     _FloatOp,
     _FloatMod,
     _FloatDivMod,
-    _NumberOp,
     _ComparisonOpLT,
     _ComparisonOpLE,
     _ComparisonOpGT,
@@ -197,7 +192,6 @@ from collections.abc import (
 from typing import (
     Literal as L,
     Any,
-    Generator,
     NoReturn,
     SupportsComplex,
     SupportsFloat,
@@ -214,7 +208,7 @@ from typing import (
 # This is because the `typeshed` stubs for the standard library include
 # `typing_extensions` stubs:
 # https://github.com/python/typeshed/blob/main/stdlib/typing_extensions.pyi
-from typing_extensions import Generic, LiteralString, Protocol, Self, TypeVar, overload
+from typing_extensions import Generic, LiteralString, Never, Protocol, Self, TypeVar, overload
 
 from numpy import (
     core,
@@ -230,7 +224,6 @@ from numpy import (
     testing,
     typing,
     version,
-    exceptions,
     dtypes,
     rec,
     char,
@@ -1773,7 +1766,9 @@ _Shape2D: TypeAlias = tuple[int, int]
 _ShapeType_co = TypeVar("_ShapeType_co", covariant=True, bound=_Shape)
 _ShapeType2 = TypeVar("_ShapeType2", bound=_Shape)
 _Shape2DType_co = TypeVar("_Shape2DType_co", covariant=True, bound=_Shape2D)
+
 _NumberType = TypeVar("_NumberType", bound=number[Any])
+_IntType = TypeVar("_IntType", bound=integer[Any])
 
 
 if sys.version_info >= (3, 12):
@@ -3104,6 +3099,8 @@ _NBit = TypeVar("_NBit", bound=NBitBase)
 _NBit1 = TypeVar("_NBit1", bound=NBitBase)
 _NBit2 = TypeVar("_NBit2", bound=NBitBase, default=_NBit1)
 
+_NBit_co = TypeVar("_NBit_co", bound=NBitBase, covariant=True)
+
 class generic(_ArrayOrScalarCommon):
     @abstractmethod
     def __init__(self, *args: Any, **kwargs: Any) -> None: ...
@@ -3297,36 +3294,6 @@ class generic(_ArrayOrScalarCommon):
     @property
     def dtype(self) -> _dtype[Self]: ...
 
-class number(generic, Generic[_NBit1]):  # type: ignore
-    @property
-    def real(self) -> Self: ...
-    @property
-    def imag(self) -> Self: ...
-    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
-    def __int__(self) -> int: ...
-    def __float__(self) -> float: ...
-    def __complex__(self) -> complex: ...
-    def __neg__(self) -> Self: ...
-    def __pos__(self) -> Self: ...
-    def __abs__(self) -> Self: ...
-    # Ensure that objects annotated as `number` support arithmetic operations
-    __add__: _NumberOp
-    __radd__: _NumberOp
-    __sub__: _NumberOp
-    __rsub__: _NumberOp
-    __mul__: _NumberOp
-    __rmul__: _NumberOp
-    __floordiv__: _NumberOp
-    __rfloordiv__: _NumberOp
-    __pow__: _NumberOp
-    __rpow__: _NumberOp
-    __truediv__: _NumberOp
-    __rtruediv__: _NumberOp
-    __lt__: _ComparisonOpLT[_NumberLike_co, _ArrayLikeNumber_co]
-    __le__: _ComparisonOpLE[_NumberLike_co, _ArrayLikeNumber_co]
-    __gt__: _ComparisonOpGT[_NumberLike_co, _ArrayLikeNumber_co]
-    __ge__: _ComparisonOpGE[_NumberLike_co, _ArrayLikeNumber_co]
-
 class bool(generic):
     def __init__(self, value: object = ..., /) -> None: ...
     def item(
@@ -3376,7 +3343,7 @@ class bool(generic):
 bool_: TypeAlias = bool
 
 _StringType = TypeVar("_StringType", bound=str | bytes)
-_ShapeType = TypeVar("_ShapeType", bound=Any)
+_ShapeType = TypeVar("_ShapeType", bound=tuple[int, ...])
 _ObjectType = TypeVar("_ObjectType", bound=object)
 
 # A sequence-like interface like `collections.abc.Sequence`, but without the
@@ -3429,122 +3396,6 @@ class _DatetimeScalar(Protocol):
     @property
     def year(self) -> int: ...
 
-# TODO: `item`/`tolist` returns either `dt.date`, `dt.datetime` or `int`
-# depending on the unit
-class datetime64(generic):
-    @overload
-    def __init__(
-        self,
-        value: None | datetime64 | _CharLike_co | _DatetimeScalar = ...,
-        format: _CharLike_co | tuple[_CharLike_co, _IntLike_co] = ...,
-        /,
-    ) -> None: ...
-    @overload
-    def __init__(
-        self,
-        value: int,
-        format: _CharLike_co | tuple[_CharLike_co, _IntLike_co],
-        /,
-    ) -> None: ...
-    def __add__(self, other: _TD64Like_co, /) -> datetime64: ...
-    def __radd__(self, other: _TD64Like_co, /) -> datetime64: ...
-    @overload
-    def __sub__(self, other: datetime64, /) -> timedelta64: ...
-    @overload
-    def __sub__(self, other: _TD64Like_co, /) -> datetime64: ...
-    def __rsub__(self, other: datetime64, /) -> timedelta64: ...
-    __lt__: _ComparisonOpLT[datetime64, _ArrayLikeDT64_co]
-    __le__: _ComparisonOpLE[datetime64, _ArrayLikeDT64_co]
-    __gt__: _ComparisonOpGT[datetime64, _ArrayLikeDT64_co]
-    __ge__: _ComparisonOpGE[datetime64, _ArrayLikeDT64_co]
-
-_IntValue: TypeAlias = SupportsInt | _CharLike_co | SupportsIndex
-_FloatValue: TypeAlias = None | _CharLike_co | SupportsFloat | SupportsIndex
-_ComplexValue: TypeAlias = (
-    None
-    | _CharLike_co
-    | SupportsFloat
-    | SupportsComplex
-    | SupportsIndex
-    | complex  # `complex` is not a subtype of `SupportsComplex`
-)
-
-class integer(number[_NBit1]):  # type: ignore
-    @property
-    def numerator(self) -> Self: ...
-    @property
-    def denominator(self) -> L[1]: ...
-    @overload
-    def __round__(self, ndigits: None = ..., /) -> int: ...
-    @overload
-    def __round__(self, ndigits: SupportsIndex, /) -> Self: ...
-
-    # NOTE: `__index__` is technically defined in the bottom-most
-    # sub-classes (`int64`, `uint32`, etc)
-    def item(
-        self, args: L[0] | tuple[()] | tuple[L[0]] = ..., /,
-    ) -> int: ...
-    def tolist(self) -> int: ...
-    def is_integer(self) -> L[True]: ...
-    def bit_count(self) -> int: ...
-    def __index__(self) -> int: ...
-    __truediv__: _IntTrueDiv[_NBit1]
-    __rtruediv__: _IntTrueDiv[_NBit1]
-    def __mod__(self, value: _IntLike_co, /) -> integer[Any]: ...
-    def __rmod__(self, value: _IntLike_co, /) -> integer[Any]: ...
-    def __invert__(self) -> Self: ...
-    # Ensure that objects annotated as `integer` support bit-wise operations
-    def __lshift__(self, other: _IntLike_co, /) -> integer[Any]: ...
-    def __rlshift__(self, other: _IntLike_co, /) -> integer[Any]: ...
-    def __rshift__(self, other: _IntLike_co, /) -> integer[Any]: ...
-    def __rrshift__(self, other: _IntLike_co, /) -> integer[Any]: ...
-    def __and__(self, other: _IntLike_co, /) -> integer[Any]: ...
-    def __rand__(self, other: _IntLike_co, /) -> integer[Any]: ...
-    def __or__(self, other: _IntLike_co, /) -> integer[Any]: ...
-    def __ror__(self, other: _IntLike_co, /) -> integer[Any]: ...
-    def __xor__(self, other: _IntLike_co, /) -> integer[Any]: ...
-    def __rxor__(self, other: _IntLike_co, /) -> integer[Any]: ...
-
-class signedinteger(integer[_NBit1]):
-    def __init__(self, value: _IntValue = ..., /) -> None: ...
-    __add__: _SignedIntOp[_NBit1]
-    __radd__: _SignedIntOp[_NBit1]
-    __sub__: _SignedIntOp[_NBit1]
-    __rsub__: _SignedIntOp[_NBit1]
-    __mul__: _SignedIntOp[_NBit1]
-    __rmul__: _SignedIntOp[_NBit1]
-    __floordiv__: _SignedIntOp[_NBit1]
-    __rfloordiv__: _SignedIntOp[_NBit1]
-    __pow__: _SignedIntOp[_NBit1]
-    __rpow__: _SignedIntOp[_NBit1]
-    __lshift__: _SignedIntBitOp[_NBit1]
-    __rlshift__: _SignedIntBitOp[_NBit1]
-    __rshift__: _SignedIntBitOp[_NBit1]
-    __rrshift__: _SignedIntBitOp[_NBit1]
-    __and__: _SignedIntBitOp[_NBit1]
-    __rand__: _SignedIntBitOp[_NBit1]
-    __xor__: _SignedIntBitOp[_NBit1]
-    __rxor__: _SignedIntBitOp[_NBit1]
-    __or__: _SignedIntBitOp[_NBit1]
-    __ror__: _SignedIntBitOp[_NBit1]
-    __mod__: _SignedIntMod[_NBit1]
-    __rmod__: _SignedIntMod[_NBit1]
-    __divmod__: _SignedIntDivMod[_NBit1]
-    __rdivmod__: _SignedIntDivMod[_NBit1]
-
-int8 = signedinteger[_8Bit]
-int16 = signedinteger[_16Bit]
-int32 = signedinteger[_32Bit]
-int64 = signedinteger[_64Bit]
-
-byte = signedinteger[_NBitByte]
-short = signedinteger[_NBitShort]
-intc = signedinteger[_NBitIntC]
-intp = signedinteger[_NBitIntP]
-int_ = intp
-long = signedinteger[_NBitLong]
-longlong = signedinteger[_NBitLongLong]
-
 # TODO: `item`/`tolist` returns either `dt.timedelta` or `int`
 # depending on the unit
 class timedelta64(generic):
@@ -3586,9 +3437,258 @@ class timedelta64(generic):
     __gt__: _ComparisonOpGT[_TD64Like_co, _ArrayLikeTD64_co]
     __ge__: _ComparisonOpGE[_TD64Like_co, _ArrayLikeTD64_co]
 
-class unsignedinteger(integer[_NBit1]):
-    # NOTE: `uint64 + signedinteger -> float64`
+# TODO: `item`/`tolist` returns either `dt.date`, `dt.datetime` or `int`
+# depending on the unit
+class datetime64(generic):
+    @overload
+    def __init__(
+        self,
+        value: None | datetime64 | _CharLike_co | _DatetimeScalar = ...,
+        format: _CharLike_co | tuple[_CharLike_co, _IntLike_co] = ...,
+        /,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self,
+        value: int,
+        format: _CharLike_co | tuple[_CharLike_co, _IntLike_co],
+        /,
+    ) -> None: ...
+    def __add__(self, other: _TD64Like_co, /) -> datetime64: ...
+    def __radd__(self, other: _TD64Like_co, /) -> datetime64: ...
+    @overload
+    def __sub__(self, other: datetime64, /) -> timedelta64: ...
+    @overload
+    def __sub__(self, other: _TD64Like_co, /) -> datetime64: ...
+    def __rsub__(self, other: datetime64, /) -> timedelta64: ...
+    __lt__: _ComparisonOpLT[datetime64, _ArrayLikeDT64_co]
+    __le__: _ComparisonOpLE[datetime64, _ArrayLikeDT64_co]
+    __gt__: _ComparisonOpGT[datetime64, _ArrayLikeDT64_co]
+    __ge__: _ComparisonOpGE[datetime64, _ArrayLikeDT64_co]
+
+_IntValue: TypeAlias = SupportsInt | _CharLike_co | SupportsIndex
+_FloatValue: TypeAlias = None | _CharLike_co | SupportsFloat | SupportsIndex
+_ComplexValue: TypeAlias = (
+    None
+    | _CharLike_co
+    | SupportsFloat
+    | SupportsComplex
+    | SupportsIndex
+    | complex  # `complex` is not a subtype of `SupportsComplex`
+)
+
+# @type_check_only
+# class _SupportsLT(Protocol[_T_contra]):
+#     def __lt__(self, other: _T_contra, /) -> object: ...
+
+# @type_check_only
+# class _SupportsLE(Protocol[_T_contra]):
+#     def __le__(self, other: _T_contra, /) -> object: ...
+
+# @type_check_only
+# class _SupportsGT(Protocol[_T_contra]):
+#     def __gt__(self, other: _T_contra, /) -> object: ...
+
+# @type_check_only
+# class _SupportsGE(Protocol[_T_contra]):
+#     def __ge__(self, other: _T_contra, /) -> object: ...
+
+
+class number(generic, Generic[_NBit_co]):
+    @property
+    @abstractmethod
+    def real(self) -> number[_NBit_co]: ...
+    @property
+    @abstractmethod
+    def imag(self) -> number[_NBit_co]: ...
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+    def __int__(self, /) -> int: ...
+    def __float__(self, /) -> float: ...
+    def __complex__(self, /) -> complex: ...
+
+    # NOTE: The modulo- and bitwise ops technically exists in `number`, but not all
+    # conrete subtypes implement them, and are therefore omitted here
+
+    # unary ops
+    def __neg__(self, /) -> Self: ...
+    def __pos__(self, /) -> Self: ...
+    @abstractmethod
+    def __abs__(self, /) -> number[_NBit_co]: ...
+    @abstractmethod
+    def __invert__(self: Never, /) -> integer[Any]: ...  # type: ignore[misc]
+
+    # arithmetic ops
+    @overload
+    def __add__(self, other: int | np.bool | Self, /) -> Self: ...
+    @overload
+    def __add__(self, other: complex | number[_NBit_co], /) -> number[Any]: ...
+    __radd__ = __add__
+    @overload
+    def __sub__(self, other: int | np.bool | Self, /) -> Self: ...
+    @overload
+    def __sub__(self, other: complex | number[_NBit_co], /) -> number[Any]: ...
+    __rsub__ = __sub__
+    @overload
+    def __mul__(self, other: int | np.bool | Self, /) -> Self: ...
+    @overload
+    def __mul__(self, other: complex | number[_NBit_co], /) -> number[Any]: ...
+    __rmul__ = __mul__
+    @overload
+    def __pow__(self, other: int | np.bool | Self, /) -> Self: ...
+    @overload
+    def __pow__(self, other: complex | number[_NBit_co], /) -> number[Any]: ...
+    __rpow__ = __pow__
+    def __truediv__(self, other: complex | number[_NBit_co], /) -> inexact[Any]: ...
+    __rtruediv__ = __truediv__
+
+    # modulo ops (`complexfloating` always returns `NotImplemented`)
+    @abstractmethod
+    def __mod__(self, other: Never, /) -> number[Any]: ...
+    @abstractmethod
+    def __rmod__(self, other: Never, /) -> number[Any]: ...
+    @abstractmethod
+    def __divmod__(self, other: Never, /) -> tuple[number[Any], number[Any]]: ...
+    @abstractmethod
+    def __rdivmod__(self, other: Never, /) -> tuple[number[Any], number[Any]]: ...
+    @abstractmethod
+    def __floordiv__(self, other: Never, /) -> number[Any]: ...
+    @abstractmethod
+    def __rfloordiv__(self, other: Never, /) -> number[Any]: ...
+
+    # bitwise ops (only implemented for integers, but these exist at runtime either way)
+    @abstractmethod
+    def __lshift__(self, other: Never, /) -> integer[Any]: ...
+    @abstractmethod
+    def __rlshift__(self, other: Never, /) -> integer[Any]: ...
+    @abstractmethod
+    def __rshift__(self, other: Never, /) -> integer[Any]: ...
+    @abstractmethod
+    def __rrshift__(self, other: Never, /) -> integer[Any]: ...
+    @abstractmethod
+    def __and__(self, other: Never, /) -> integer[Any]: ...
+    @abstractmethod
+    def __rand__(self, other: Never, /) -> integer[Any]: ...
+    @abstractmethod
+    def __xor__(self, other: Never, /) -> integer[Any]: ...
+    @abstractmethod
+    def __rxor__(self, other: Never, /) -> integer[Any]: ...
+    @abstractmethod
+    def __or__(self, other: Never, /) -> integer[Any]: ...
+    @abstractmethod
+    def __ror__(self, other: Never, /) -> integer[Any]: ...
+
+    # @overload
+    # def __lt__(self, other: _NumberLike_co, /) -> np.bool: ...
+    # @overload
+    # def __lt__(self, other: ndarray[_ShapeType, dtype[np.bool | number[Any]]], /) -> ndarray[_ShapeType, dtype[np.bool]]: ...
+    # @overload
+    # def __lt__(self, other: _NestedSequence[_SupportsGT[Self]], /) -> NDArray[np.bool]: ...
+    # @overload
+    # def __lt__(self, other: _ArrayLikeNumber_co, /) -> np.bool | NDArray[np.bool]: ...
+
+    # @overload
+    # def __le__(self, other: _NumberLike_co, /) -> np.bool: ...
+    # @overload
+    # def __le__(self, other: ndarray[_ShapeType, dtype[np.bool | number[Any]]], /) -> ndarray[_ShapeType, dtype[np.bool]]: ...
+    # @overload
+    # def __le__(self, other: _NestedSequence[_SupportsGE[Self]], /) -> NDArray[np.bool]: ...
+    # @overload
+    # def __le__(self, other: _ArrayLikeNumber_co, /) -> np.bool | NDArray[np.bool]: ...
+
+    # @overload
+    # def __gt__(self, other: _NumberLike_co, /) -> np.bool: ...
+    # @overload
+    # def __gt__(self, other: ndarray[_ShapeType, dtype[np.bool | number[Any]]], /) -> ndarray[_ShapeType, dtype[np.bool]]: ...
+    # @overload
+    # def __gt__(self, other: _NestedSequence[_SupportsLT[Self]], /) -> NDArray[np.bool]: ...
+    # @overload
+    # def __gt__(self, other: _ArrayLikeNumber_co, /) -> np.bool | NDArray[np.bool]: ...
+
+    # @overload
+    # def __ge__(self, other: _NumberLike_co, /) -> np.bool: ...
+    # @overload
+    # def __ge__(self, other: ndarray[_ShapeType, dtype[np.bool | number[Any]]], /) -> ndarray[_ShapeType, dtype[np.bool]]: ...
+    # @overload
+    # def __ge__(self, other: _NestedSequence[_SupportsLE[Self]], /) -> NDArray[np.bool]: ...
+    # @overload
+    # def __ge__(self, other: _ArrayLikeNumber_co, /) -> np.bool | NDArray[np.bool]: ...
+
+    __lt__: _ComparisonOpLT[_NumberLike_co, _ArrayLikeNumber_co]
+    __le__: _ComparisonOpLE[_NumberLike_co, _ArrayLikeNumber_co]
+    __gt__: _ComparisonOpGT[_NumberLike_co, _ArrayLikeNumber_co]
+    __ge__: _ComparisonOpGE[_NumberLike_co, _ArrayLikeNumber_co]
+
+class integer(number[_NBit_co]):
+    @abstractmethod
     def __init__(self, value: _IntValue = ..., /) -> None: ...
+
+    @property
+    def real(self) -> Self: ...
+    @property
+    def imag(self) -> Self: ...
+    @property
+    def numerator(self) -> Self: ...
+    @property
+    def denominator(self) -> L[1]: ...
+
+    def item(self, arg: L[0] | tuple[()] | tuple[L[0]] = ..., /) -> int: ...
+    def tolist(self, /) -> int: ...
+    def is_integer(self, /) -> L[True]: ...
+    def bit_count(self, /) -> int: ...
+
+    # TODO: move `__index__` to the conrete subclasses once implemented
+    def __index__(self, /) -> int: ...
+    def __abs__(self, /) -> Self: ...
+    def __invert__(self, /) -> Self: ...
+    @overload
+    def __round__(self, ndigits: None = None, /) -> int: ...
+    @overload
+    def __round__(self, ndigits: SupportsIndex, /) -> Self: ...
+
+_SCT_i = TypeVar("_SCT_i", bound=signedinteger[Any])
+
+class signedinteger(integer[_NBit_co]):
+    def __init__(self, value: _IntValue = ..., /) -> None: ...
+
+    # TODO
+    __add__: _SignedIntOp[_NBit_co]
+    __radd__: _SignedIntOp[_NBit_co]
+    __sub__: _SignedIntOp[_NBit_co]
+    __rsub__: _SignedIntOp[_NBit_co]
+    __mul__: _SignedIntOp[_NBit_co]
+    __rmul__: _SignedIntOp[_NBit_co]
+    __floordiv__: _SignedIntOp[_NBit_co]
+    __rfloordiv__: _SignedIntOp[_NBit_co]
+    __pow__: _SignedIntOp[_NBit_co]
+    __rpow__: _SignedIntOp[_NBit_co]
+
+    # bitwise ops
+    @overload
+    def __and__(self, other: int | np.bool | signedinteger[_NBit_co], /) -> Self: ...
+    @overload
+    def __and__(self, other: uint32, /) -> signedinteger[_64Bit | _NBit_co]: ...
+    @overload
+    def __and__(self, other: uint16, /) -> signedinteger[_32Bit | _NBit_co]: ...
+    @overload
+    def __and__(self, other: uint8, /) -> signedinteger[_16Bit | _NBit_co]: ...
+
+
+
+int8 = signedinteger[_8Bit]
+int16 = signedinteger[_16Bit]
+int32 = signedinteger[_32Bit]
+int64 = signedinteger[_64Bit]
+
+byte = signedinteger[_NBitByte]
+short = signedinteger[_NBitShort]
+intc = signedinteger[_NBitIntC]
+intp = signedinteger[_NBitIntP]
+int_ = intp
+
+class unsignedinteger(integer[_NBit1]):
+    def __init__(self, value: _IntValue = ..., /) -> None: ...
+
+    # NOTE: `uint64 + signedinteger -> float64`
     __add__: _UnsignedIntOp[_NBit1]
     __radd__: _UnsignedIntOp[_NBit1]
     __sub__: _UnsignedIntOp[_NBit1]
@@ -3628,8 +3728,6 @@ ulong: TypeAlias = unsignedinteger[_NBitLong]
 ulonglong: TypeAlias = unsignedinteger[_NBitLongLong]
 
 class inexact(number[_NBit1]): ...  # type: ignore[misc]
-
-_IntType = TypeVar("_IntType", bound=integer[Any])
 
 class floating(inexact[_NBit1]):
     def __init__(self, value: _FloatValue = ..., /) -> None: ...
