@@ -1,3 +1,4 @@
+from typing import Literal
 import numpy as np
 
 from typing_extensions import assert_type
@@ -9,5 +10,5 @@ assert_type(np.nan, float)
 assert_type(np.pi, float)
 
 assert_type(np.little_endian, bool)
-assert_type(np.True_, np.bool)
-assert_type(np.False_, np.bool)
+assert_type(np.True_, np.bool[Literal[True]])
+assert_type(np.False_, np.bool[Literal[False]])

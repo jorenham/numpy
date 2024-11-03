@@ -15,7 +15,7 @@ m: np.timedelta64
 U: np.str_
 S: np.bytes_
 V: np.void
-O: np.object_  # cannot exists at runtime
+O: np.object_[complex]  # at runtime this is a `complex`
 
 array_nd: np.ndarray[Any, Any]
 array_0d: np.ndarray[tuple[()], Any]
@@ -51,7 +51,7 @@ assert_type(V[["field1", "field2"]], np.void)
 V[0] = 5
 
 # Aliases
-assert_type(np.bool_(), np.bool)
+assert_type(np.bool_(), np.bool[Literal[False]])
 assert_type(np.byte(), np.byte)
 assert_type(np.short(), np.short)
 assert_type(np.intc(), np.intc)
@@ -158,8 +158,8 @@ assert_type(f8.__floor__(), int)
 
 assert_type(i8.is_integer(), Literal[True])
 
-assert_type(O.real, np.object_)
-assert_type(O.imag, np.object_)
+assert_type(O.real, float)
+assert_type(O.imag, float)
 assert_type(int(O), int)
 assert_type(float(O), float)
 assert_type(complex(O), complex)

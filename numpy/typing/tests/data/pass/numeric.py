@@ -15,7 +15,7 @@ class SubClass(npt.NDArray[np.float64]):
 
 i8 = np.int64(1)
 
-A = np.arange(27).reshape(3, 3, 3)
+A = np.ones((3, 3, 3), dtype=np.uint16)
 B: list[list[list[int]]] = A.tolist()
 C = np.empty((27, 27)).view(SubClass)
 

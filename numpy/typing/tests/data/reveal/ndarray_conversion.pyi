@@ -1,9 +1,10 @@
 from typing import Any
+from typing_extensions import assert_type
 
 import numpy as np
 import numpy.typing as npt
+from numpy import _NDList
 
-from typing_extensions import assert_type
 
 nd: npt.NDArray[np.int_]
 
@@ -14,7 +15,7 @@ assert_type(nd.item(0, 1), int)
 assert_type(nd.item((0, 1)), int)
 
 # tolist
-assert_type(nd.tolist(), Any)
+assert_type(nd.tolist(), _NDList[int])
 
 # itemset does not return a value
 # tostring is pretty simple

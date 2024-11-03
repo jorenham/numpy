@@ -22,12 +22,12 @@ u4 = np.uint32()
 dt = np.datetime64(0, "D")
 td = np.timedelta64(0, "D")
 
-b_ = np.bool()
+b_: np.bool
 
-b = bool()
-c = complex()
-f = float()
-i = int()
+b: bool
+c: complex
+f: float
+i: int
 
 AR_b: npt.NDArray[np.bool]
 AR_u: npt.NDArray[np.uint32]
