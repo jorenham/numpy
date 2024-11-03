@@ -3,8 +3,6 @@ from typing import Literal as L, Any, overload, TypeVar
 
 import numpy as np
 from numpy import (
-    _SupportsImag,
-    _SupportsReal,
     dtype,
     generic,
     floating,
@@ -21,6 +19,7 @@ from numpy._typing import (
     _ScalarLike_co,
     _ArrayLike,
 )
+from numpy._typing._protocols import _SupportsImag, _SupportsReal
 
 __all__ = [
     "iscomplexobj",
