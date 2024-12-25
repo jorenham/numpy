@@ -1,6 +1,7 @@
 import builtins
 from typing import (
     Any,
+    Final,
     Literal as L,
     TypedDict,
     type_check_only,
@@ -184,8 +185,8 @@ def isdtype(
 
 def issubdtype(arg1: DTypeLike, arg2: DTypeLike) -> bool: ...
 
-typecodes: _TypeCodes
-ScalarType: tuple[
+typecodes: Final[_TypeCodes] = ...
+ScalarType: Final[tuple[
     type[int],
     type[float],
     type[complex],
@@ -217,4 +218,4 @@ ScalarType: tuple[
     type[ulong],
     type[ulonglong],
     type[void],
-]
+]] = ...
