@@ -35,11 +35,8 @@ np.shares_memory(1, 1, max_work=i8)  # E: incompatible type
 np.may_share_memory(1, 1, max_work=i8)  # E: incompatible type
 
 np.arange(M)  # E: No overload variant
-np.arange(stop=10)  # E: No overload variant
 
 np.datetime_data(int)  # E: incompatible type
-
-np.busday_offset("2012", 10)  # E: No overload variant
 
 np.datetime_as_string("2012")  # E: No overload variant
 
