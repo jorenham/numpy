@@ -141,6 +141,7 @@ __all__ = [
     "sign",
     "signbit",
     "sin",
+    "sinc",
     "sinh",
     "spacing",
     "sqrt",
@@ -1406,9 +1407,12 @@ class _ufunc_11_fo(_ufunc_11):  # type: ignore[misc]
     @overload
     def at[IxT, OutT](self, a: _CanUfuncAt1[IxT, OutT], indices: IxT, /) -> OutT: ...
 
+# sinc promotes even the small integer types to float64.
+_AsFloat64T = TypeVar("_AsFloat64T", bound=_to_integer, default=_as_f64, contravariant=True)
+
 # efdgFDGO => efdgFDGO
 @type_check_only
-class _ufunc_11_fco(_ufunc_11):  # type: ignore[misc]
+class _ufunc_11_fco(_ufunc_11, Generic[_AsFloat64T]):  # type: ignore[misc]
     @override
     @overload  # known shape, known scalar/array
     def __call__[T: np.inexact | npt.NDArray[np.inexact | np.object_]](
@@ -1423,7 +1427,7 @@ class _ufunc_11_fco(_ufunc_11):  # type: ignore[misc]
     @overload  # Nd, +f64
     def __call__[ShapeT: _Shape](
         self,
-        x: _Array[ShapeT, _as_f64],
+        x: _Array[ShapeT, _AsFloat64T],
         /,
         *,
         out: EllipsisType | None = None,
@@ -1453,7 +1457,7 @@ class _ufunc_11_fco(_ufunc_11):  # type: ignore[misc]
     @overload  # scalar, float | +f64
     def __call__(
         self,
-        x: float | _as_f64,
+        x: float | _AsFloat64T,
         /,
         *,
         out: None = None,
@@ -1520,6 +1524,21 @@ class _ufunc_11_fco(_ufunc_11):  # type: ignore[misc]
         dtype: None = None,
         **kwargs: Unpack[_Kwargs11],
     ) -> Array2D[np.complex128]: ...
+    @overload  # sinc preserves its nested-sequence overloads
+    def __call__(
+        self: _ufunc_11_fco[_to_integer], x: Sequence[Sequence[Sequence[float]]], /, *,
+        out: None = None, dtype: None = None, **kwargs: Unpack[_Kwargs11],
+    ) -> Array3D[np.float64]: ...
+    @overload
+    def __call__(
+        self: _ufunc_11_fco[_to_integer], x: Sequence[Sequence[list[complex]]], /, *,
+        out: None = None, dtype: None = None, **kwargs: Unpack[_Kwargs11],
+    ) -> Array3D[np.complex128]: ...
+    @overload
+    def __call__(
+        self: _ufunc_11_fco[_to_integer], x: _NestedSequence[float], /, *,
+        out: None = None, dtype: None = None, **kwargs: Unpack[_Kwargs11],
+    ) -> npt.NDArray[np.float64]: ...
     @overload  # scalar, +complex  (overlaps with float)
     def __call__(
         self,
@@ -3303,6 +3322,7 @@ log1p: Final[_ufunc_11_fco] = ...
 log2: Final[_ufunc_11_fco] = ...
 rint: Final[_ufunc_11_fco] = ...
 sin: Final[_ufunc_11_fco] = ...
+sinc: Final[_ufunc_11_fco[_to_integer]] = ...
 sinh: Final[_ufunc_11_fco] = ...
 sqrt: Final[_ufunc_11_fco] = ...
 tan: Final[_ufunc_11_fco] = ...

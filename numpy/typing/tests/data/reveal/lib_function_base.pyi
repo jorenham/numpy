@@ -403,11 +403,23 @@ assert_type(np.i0(AR_i8), npt.NDArray[np.float64])
 
 # sinc (cardinal sine function)
 assert_type(np.sinc(1.0), np.float64)
+assert_type(np.sinc(np.int8(1)), np.float64)
+assert_type(np.sinc(np.int16(1)), np.float64)
+assert_type(np.sinc(AR_f8, out=AR_f8, where=True), npt.NDArray[np.float64])
 assert_type(np.sinc(1j), np.complex128 | Any)
 assert_type(np.sinc(AR_f8), npt.NDArray[np.float64])
 assert_type(np.sinc(AR_c16), npt.NDArray[np.complex128])
 assert_type(np.sinc(AR_LIKE_f8), np.ndarray[tuple[int], np.dtype[np.float64]])
 assert_type(np.sinc(AR_LIKE_c16), np.ndarray[tuple[int], np.dtype[np.complex128]])
+
+def check_sinc(
+    f: list[list[list[float]]],
+    deep: list[list[list[list[float]]]],
+    c: list[list[list[complex]]],
+) -> None:
+    assert_type(np.sinc(f), npt.Array3D[np.float64])
+    assert_type(np.sinc(deep), npt.NDArray[np.float64])
+    assert_type(np.sinc(c), npt.Array3D[np.complex128])
 
 # median
 assert_type(np.median(AR_i8), np.float64)

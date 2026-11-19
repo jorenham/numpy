@@ -19,6 +19,21 @@ class Linspace(Benchmark):
     def time_linspace_array(self):
         np.linspace(self.d, 10, 10)
 
+class Sinc(Benchmark):
+    param_names = ['size', 'dtype']
+    params = [[16, 1_000_000], ['float32', 'float64', 'complex128']]
+
+    def setup(self, size, dtype):
+        rng = np.random.default_rng(21)
+        x = rng.uniform(-10, 10, size)
+        if dtype == 'complex128':
+            x = x + 1j * rng.uniform(-4, 4, size)
+        self.x = x.astype(dtype)
+
+    def time_sinc(self, size, dtype):
+        np.sinc(self.x)
+
+
 class Histogram1D(Benchmark):
     def setup(self):
         self.d = np.linspace(0, 100, 100000)

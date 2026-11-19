@@ -94,7 +94,7 @@ def _override___module__():
         'logical_xor', 'matmul', 'matvec', 'maximum', 'minimum', 'remainder',
         'modf', 'multiply', 'negative', 'nextafter', 'not_equal', 'positive',
         'power', 'rad2deg', 'radians', 'reciprocal', 'rint', 'sign', 'signbit',
-        'sin', 'sinh', 'spacing', 'sqrt', 'square', 'subtract', 'tan', 'tanh',
+        'sin', 'sinc', 'sinh', 'spacing', 'sqrt', 'square', 'subtract', 'tan', 'tanh',
         'trunc', 'vecdot', 'vecmat',
     ]:
         ufunc = namespace_names[ufunc_name]

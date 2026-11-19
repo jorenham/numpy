@@ -1,3 +1,5 @@
+#include <cfloat>
+
 #include "fast_loop_macros.h"
 #include "loops.h"
 #include "loops_utils.h"
@@ -91,6 +93,20 @@ simd_sine_poly_f32(vec_f32 &x, vec_f32 &x2)
     return r;
 }
 
+// Evaluate sin or cos on [-pi/4, pi/4] and restore the quadrant.
+HWY_INLINE HWY_ATTR vec_f32
+simd_sincos_poly_f32(vec_f32 r, vec_s32 quadrant)
+{
+    vec_f32 r2 = hn::Mul(r, r);
+    auto use_sin = hn::RebindMask(f32, hn::Eq(hn::And(quadrant, hn::Set(s32, 1)),
+                                              hn::Zero(s32)));
+    auto negate = hn::RebindMask(f32, hn::Ne(hn::And(quadrant, hn::Set(s32, 2)),
+                                             hn::Zero(s32)));
+    vec_f32 y = hn::IfThenElse(use_sin, simd_sine_poly_f32(r, r2),
+                               simd_cosine_poly_f32(r2));
+    return hn::MaskedSubOr(y, negate, hn::Zero(f32), y);
+}
+
 static void HWY_ATTR SIMD_MSVC_NOINLINE
 simd_sincos_f32(const float *src, npy_intp ssrc, float *dst, npy_intp sdst,
                 npy_intp len, SIMD_TRIG_OP trig_op)
@@ -98,7 +114,6 @@ simd_sincos_f32(const float *src, npy_intp ssrc, float *dst, npy_intp sdst,
     // Load up frequently used constants
     const vec_f32 zerosf = hn::Zero(f32);
     const vec_s32 ones = hn::Set(s32, 1);
-    const vec_s32 twos = hn::Set(s32, 2);
     const vec_f32 two_over_pi = hn::Set(f32, 0x1.45f306p-1f);
     const vec_f32 codyw_pio2_highf = hn::Set(f32, -0x1.921fb0p+00f);
     const vec_f32 codyw_pio2_medf = hn::Set(f32, -0x1.5110b4p-22f);
@@ -145,25 +160,11 @@ simd_sincos_f32(const float *src, npy_intp ssrc, float *dst, npy_intp sdst,
             vec_f32 reduced_x =
                     simd_range_reduction_f32(x, quadrant, codyw_pio2_highf,
                                              codyw_pio2_medf, codyw_pio2_lowf);
-            vec_f32 reduced_x2 = hn::Mul(reduced_x, reduced_x);
-
-            // compute cosine and sine
-            vec_f32 cos = simd_cosine_poly_f32(reduced_x2);
-            vec_f32 sin = simd_sine_poly_f32(reduced_x, reduced_x2);
-
             vec_s32 iquadrant = hn::NearestInt(quadrant);
             if (trig_op == SIMD_COMPUTE_COS) {
                 iquadrant = hn::Add(iquadrant, ones);
             }
-            // blend sin and cos based on the quadrant
-            opmask_t sine_mask = hn::RebindMask(
-                    f32, hn::Eq(hn::And(iquadrant, ones), hn::Zero(s32)));
-            cos = hn::IfThenElse(sine_mask, sin, cos);
-
-            // multiply by -1 for appropriate elements
-            opmask_t negate_mask = hn::RebindMask(
-                    f32, hn::Eq(hn::And(iquadrant, twos), twos));
-            cos = hn::MaskedSubOr(cos, negate_mask, zerosf, cos);
+            vec_f32 cos = simd_sincos_poly_f32(reduced_x, iquadrant);
             cos = hn::IfThenElse(nnan_mask, cos, hn::Set(f32, NPY_NANF));
 
             if (sdst == 1) {
@@ -229,6 +230,53 @@ simd_sincos_f32(const float *src, npy_intp ssrc, float *dst, npy_intp sdst,
 
 DISPATCH_DOUBLE_FUNC(sin)
 DISPATCH_DOUBLE_FUNC(cos)
+
+NPY_NO_EXPORT void
+NPY_CPU_DISPATCH_CURFX(FLOAT_sinc)(char **args, npy_intp const *dimensions,
+                                   npy_intp const *steps, void *NPY_UNUSED(data))
+{
+    const char *src = args[0];
+    char *dst = args[1];
+    npy_intp len = dimensions[0];
+#if NPY_SIMD_FMA3
+    const int lanes = hn::Lanes(f32);
+    // Gather offsets are signed 32-bit byte offsets.
+    const npy_intp max_stride = NPY_MAX_INT32 / lanes;
+    if (steps[1] == sizeof(float) && -max_stride <= steps[0] && steps[0] <= max_stride &&
+        len >= lanes && !is_mem_overlap(src, steps[0], dst, steps[1], len)) {
+        // Highway's portable gather requires nonnegative offsets.
+        const npy_intp base_offset = steps[0] < 0 ? (lanes - 1) * steps[0] : 0;
+        const auto byte_steps = hn::Mul(hn::Iota(s32, 0), hn::Set(s32, (int32_t)steps[0]));
+        const auto offsets = hn::Sub(byte_steps, hn::Set(s32, (int32_t)base_offset));
+        const auto one = hn::Set(f32, 1.0f);
+        const auto limit = hn::Set(f32, 0x1p23f);
+        for (; len >= lanes; len -= lanes, src += lanes * steps[0], dst += lanes * steps[1]) {
+            const float *input = (const float *)(src + base_offset);
+            auto a = hn::Abs(steps[0] == sizeof(float) ? hn::LoadU(f32, input)
+                                                       : hn::GatherOffset(f32, input, offsets));
+            auto finite = hn::IfThenElse(hn::IsFinite(a), a, limit);
+            // Tiny inputs round to one; every finite float >= 2**23 is integral.
+            auto tiny = hn::Le(finite, hn::Set(f32, FLT_EPSILON));
+            auto large = hn::Ge(finite, limit);
+            auto x = hn::IfThenElse(hn::Or(tiny, large), one, finite);
+            // Reduce to the nearest multiple of 1/2 before multiplying by pi.
+            auto twice = hn::Add(x, x);
+            auto n = hn::Floor(twice);
+            auto half = hn::Set(f32, 0.5f);
+            n = hn::IfThenElse(hn::Gt(hn::Sub(twice, n), half), hn::Add(n, one), n);
+            auto r = hn::Mul(hn::Set(f32, NPY_PIf), hn::NegMulAdd(half, n, x));
+            auto sinpi = simd_sincos_poly_f32(r, hn::ConvertTo(s32, n));
+            auto y = hn::Div(sinpi, hn::Mul(hn::Set(f32, NPY_PIf), x));
+            // a-a gives zero for large integers and NaN for nonfinite inputs.
+            y = hn::IfThenElse(large, hn::Sub(a, a), hn::IfThenElse(tiny, one, y));
+            hn::StoreU(y, f32, (float *)dst);
+        }
+    }
+#endif
+    for (; len > 0; --len, src += steps[0], dst += steps[1]) {
+        *(float *)dst = (float)npy_sinc(*(const float *)src);
+    }
+}
 
 NPY_NO_EXPORT void
 NPY_CPU_DISPATCH_CURFX(FLOAT_sin)(char **args, npy_intp const *dimensions,

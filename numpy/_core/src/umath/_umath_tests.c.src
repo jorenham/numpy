@@ -7,6 +7,7 @@
  */
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
+#include <fenv.h>
 
 #define NPY_NO_DEPRECATED_API NPY_API_VERSION
 #if defined(NPY_INTERNAL_BUILD)
@@ -969,7 +970,28 @@ UMath_Tests_create_unary_ufunc(PyObject *NPY_UNUSED(dummy),
             "fresh unary float64 test ufunc (negation)", 0);
 }
 
+/* Exercise a ufunc with directed rounding, restoring the caller's fenv
+ * even if the callable raises. Not all platforms implement FE_UPWARD. */
+static PyObject *
+call_with_rounding_upward(PyObject *NPY_UNUSED(self), PyObject *callable)
+{
+#ifdef FE_UPWARD
+    fenv_t saved;
+    if (fegetenv(&saved) == 0 && fesetround(FE_UPWARD) == 0) {
+        PyObject *result = PyObject_CallNoArgs(callable);
+        if (fesetenv(&saved) != 0) {
+            Py_XDECREF(result);
+            PyErr_SetString(PyExc_RuntimeError, "failed to restore floating-point environment");
+            return NULL;
+        }
+        return result;
+    }
+#endif
+    Py_RETURN_NOTIMPLEMENTED;
+}
+
 static PyMethodDef UMath_TestsMethods[] = {
+    {"call_with_rounding_upward", call_with_rounding_upward, METH_O, NULL},
     {"test_signature",  UMath_Tests_test_signature, METH_VARARGS,
      "Test signature parsing of ufunc. \n"
      "Arguments: nin nout signature \n"

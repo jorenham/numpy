@@ -2797,6 +2797,113 @@ class TestSinc:
         # resulting in nan
         assert_array_equal(sinc(x), np.asarray(1.0))
 
+    def test_precision_near_integers(self):
+        # Reference values computed with mpmath at 60 decimal digits.
+        x = [9.000039129512828, 3.000022083469023, -761442529114881.1]
+        expected = [-4.347704734002287e-06, -7.361102148942857e-06,
+                    -1.5997519857756192e-16]
+        assert_allclose(sinc(x), expected, rtol=4 * np.finfo(float).eps)
+        assert_array_equal(sinc([1., -2., 7., np.finfo(float).max]), 0)
+
+    def test_directed_rounding(self):
+        from numpy._core._umath_tests import call_with_rounding_upward
+
+        x = np.array([1e-20, -1e-20])
+        result = call_with_rounding_upward(lambda: sinc(x))
+        if result is NotImplemented:
+            pytest.skip("upward rounding unavailable")
+        assert_allclose(result, 1., rtol=2 * np.finfo(float).eps)
+
+    def test_float32_mixed_quadrants(self):
+        x = np.tile(np.arange(-2, 2, 0.125, dtype=np.float32), 3)
+        x[::17] = np.finfo(np.float32).smallest_subnormal
+        x[1::17] = np.finfo(np.float32).max
+        x[2::17] = np.nan
+        x = x[:-1]  # include a scalar tail after any SIMD blocks
+        tol = 4 * np.finfo(x.dtype).eps
+        with np.errstate(all='raise'):
+            expected = sinc(x.astype(np.float64))
+            result = sinc(x)
+            assert_allclose(result, expected, rtol=tol)
+            assert_allclose(sinc(x[::-1]), expected[::-1], rtol=tol)
+            sinc(x, out=x)
+            assert_array_equal(x, result)
+
+    def test_complex_subnormals(self):
+        x = np.finfo(np.float64).smallest_subnormal
+        assert sinc(complex(0, x)) == 1
+        assert sinc(np.complex64(1e-39 + 3e-40j)) == 1
+        z = 1e-20 + 2e-20j
+        assert_allclose(sinc(z).imag, -np.pi**2 / 3 * z.real * z.imag)
+        assert np.signbit(sinc(complex(0, -1)).imag)
+
+    def test_float32_infinite(self):
+        x = np.tile(np.array([np.inf, -np.inf], dtype=np.float32), 16)
+        with np.errstate(invalid='raise'):
+            with pytest.raises(FloatingPointError, match="invalid"):
+                sinc(x)
+
+    def test_complex(self):
+        x = np.array([-(2**52 + 1), -2, 1, 2**52]) + 0.5j
+        signs = np.array([-1, 1, -1, 1])
+        expected = signs * (1j * np.sinh(np.pi / 2)) / (np.pi * x)
+        assert_allclose(sinc(x), expected, rtol=4 * np.finfo(float).eps)
+
+        x = (2**51 + 0.5) + 0.5j
+        expected = np.cosh(np.pi / 2) / (np.pi * x)
+        assert_allclose(sinc(x).imag, expected.imag, rtol=4 * np.finfo(float).eps)
+
+    @pytest.mark.parametrize('z, expected, rtol', [
+        (np.complex64(2**22 + 28.47j),
+         1.7975527181431732e26 + 2.648220139711145e31j, 1e-5),
+        (2**51 + 226.16j, 2.621395528385988e279 + 2.610036240897997e292j, 1e-13),
+        (227j, 3.6243205085323226e306 + 0j, 1e-13),
+    ])
+    def test_complex_large_imag(self, z, expected, rtol):
+        # mpmath references; the intermediate complex sine can overflow.
+        with np.errstate(over='raise', invalid='raise'):
+            result = sinc(z)
+        assert_allclose(result.real, expected.real, rtol=rtol)
+        assert_allclose(result.imag, expected.imag, rtol=rtol)
+
+    def test_complex_component_overflow(self):
+        with np.errstate(over='ignore', invalid='raise'):
+            z = sinc(complex(np.finfo(float).max, 632.6))
+            pure_imag = sinc(600j)
+        assert_allclose(z.real, 3.9627770552856733e248, rtol=2e-13)
+        assert z.imag == np.inf
+        assert pure_imag == complex(np.inf, 0)
+
+    def test_nonfinite_complex_real_axis(self):
+        with np.errstate(invalid='ignore'):
+            result = sinc([complex(value, 0) for value in (np.inf, -np.inf, np.nan)])
+        assert_array_equal(np.isnan(result.real), True)
+        assert_array_equal(np.isnan(result.imag), True)
+
+    def test_object(self):
+        class Angle(float):
+            sinc = None
+
+            def __rmul__(self, scale):
+                return Angle(scale * float(self))
+
+            def sin(self):
+                return math.sin(self)
+
+        x = np.array([Angle(0), Angle(0.5)], dtype=object)
+        assert_array_equal(sinc(x), [1., 2 / np.pi])
+
+    def test_object_without_sin(self):
+        with pytest.raises(TypeError, match="no callable sin method"):
+            sinc(np.array([1.], dtype=object))
+
+    def test_ufunc(self):
+        assert isinstance(sinc, np.ufunc)
+        out = np.full(6, -1.)
+        result = sinc([0., 0.5, 2.], out=out[::2], where=[True, False, True])
+        assert np.shares_memory(result, out)
+        assert_array_equal(out, [1., -1., -1., -1., 0., -1.])
+
 
 class TestUnique:
 

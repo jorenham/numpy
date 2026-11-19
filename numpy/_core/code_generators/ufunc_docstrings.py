@@ -4086,6 +4086,71 @@ add_newdoc('numpy._core.umath', 'sin',
 
     """)
 
+add_newdoc('numpy._core.umath', 'sinc',
+    r"""
+    Return the normalized sinc function.
+
+    The sinc function is equal to :math:`\sin(\pi x)/(\pi x)` for any argument
+    :math:`x\ne 0`. ``sinc(0)`` takes the limit value 1, making ``sinc`` not
+    only everywhere continuous but also infinitely differentiable.
+
+    .. note::
+
+        Note the normalization factor of ``pi`` used in the definition.
+        This is the most commonly used definition in signal processing.
+        Use ``sinc(x / np.pi)`` to obtain the unnormalized sinc function
+        :math:`\sin(x)/x` that is more common in mathematics.
+
+    Parameters
+    ----------
+    x : array_like
+        Array (possibly multi-dimensional) of values for which to calculate
+        ``sinc(x)``.
+    $PARAMS
+
+    Returns
+    -------
+    out : ndarray or scalar
+        ``sinc(x)``, which has the same shape as the input.
+        $OUT_SCALAR_1
+
+    Notes
+    -----
+    The name sinc is short for "sine cardinal" or "sinus cardinalis".
+
+    The sinc function is used in various signal processing applications,
+    including in anti-aliasing, in the construction of a Lanczos resampling
+    filter, and in interpolation.
+
+    For bandlimited interpolation of discrete-time signals, the ideal
+    interpolation kernel is proportional to the sinc function.
+
+    References
+    ----------
+    .. [1] Weisstein, Eric W. "Sinc Function." From MathWorld--A Wolfram Web
+           Resource. https://mathworld.wolfram.com/SincFunction.html
+    .. [2] Wikipedia, "Sinc function",
+           https://en.wikipedia.org/wiki/Sinc_function
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import matplotlib.pyplot as plt
+    >>> x = np.linspace(-4, 4, 41)
+    >>> np.sinc([0, 0.5, 1])
+    array([1.        , 0.63661977, 0.        ])
+
+    >>> plt.plot(x, np.sinc(x))
+    [<matplotlib.lines.Line2D object at 0x...>]
+    >>> plt.title("Sinc Function")
+    Text(0.5, 1.0, 'Sinc Function')
+    >>> plt.ylabel("Amplitude")
+    Text(0, 0.5, 'Amplitude')
+    >>> plt.xlabel("X")
+    Text(0.5, 0, 'X')
+    >>> plt.show()
+    """)
+
 add_newdoc('numpy._core.umath', 'sinh',
     """
     Hyperbolic sine, element-wise.

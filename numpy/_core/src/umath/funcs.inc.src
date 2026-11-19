@@ -8,6 +8,9 @@
 
 #define NPY_NO_DEPRECATED_API NPY_API_VERSION
 
+#include <float.h>
+#include <limits.h>
+
 #include "npy_import.h"
 #include "npy_static_data.h"
 #include "module_state.h"
@@ -18,6 +21,55 @@
  **                        PYTHON OBJECT FUNCTIONS                          **
  *****************************************************************************
  */
+
+static PyObject *
+npy_ObjectSinc(PyObject *x)
+{
+    PyObject *method;
+    int found = PyObject_GetOptionalAttrString(x, "sinc", &method);
+    if (found < 0) {
+        return NULL;
+    }
+    if (found && PyCallable_Check(method)) {
+        PyObject *result = PyObject_CallNoArgs(method);
+        Py_DECREF(method);
+        return result;
+    }
+
+    Py_XDECREF(method);
+
+    /* The original Python sinc called sin on pi*x for object arrays. */
+    PyObject *pi = PyFloat_FromDouble(NPY_PI);
+    if (pi == NULL) {
+        return NULL;
+    }
+    PyObject *y = PyNumber_Multiply(pi, x);
+    Py_DECREF(pi);
+    if (y == NULL) {
+        return NULL;
+    }
+    int nonzero = PyObject_IsTrue(y);
+    if (nonzero <= 0) {
+        Py_DECREF(y);
+        return nonzero < 0 ? NULL : PyFloat_FromDouble(1.0);
+    }
+    found = PyObject_GetOptionalAttrString(y, "sin", &method);
+    if (found <= 0 || !PyCallable_Check(method)) {
+        if (found >= 0) {
+            PyErr_Format(PyExc_TypeError, "object of type %.200s has no callable sin method",
+                         Py_TYPE(y)->tp_name);
+        }
+        Py_XDECREF(method);
+        Py_DECREF(y);
+        return NULL;
+    }
+    PyObject *numerator = PyObject_CallNoArgs(method);
+    Py_DECREF(method);
+    PyObject *result = numerator == NULL ? NULL : PyNumber_TrueDivide(numerator, y);
+    Py_XDECREF(numerator);
+    Py_DECREF(y);
+    return result;
+}
 
 static PyObject *
 Py_square(PyObject *o)
@@ -241,6 +293,113 @@ npy_ObjectClip(PyObject *arr, PyObject *min, PyObject *max) {
     Py_SETREF(o, npy_ObjectMin(o, max));
     return o;
 }
+
+/* The half and single precision scalar loops evaluate sinc in double. */
+/**begin repeat
+ * #ftype = npy_double, npy_longdouble#
+ * #ctype = npy_cdouble, npy_clongdouble#
+ * #c = , l#
+ * #eps = DBL_EPSILON, LDBL_EPSILON#
+ * #tiny = DBL_MIN, LDBL_MIN#
+ * #max_exp = DBL_MAX_EXP, LDBL_MAX_EXP#
+ */
+/* Get the residual and quotient for the sinpi reduction. The period is
+ * 1 (sine) or 1/2 (sine and cosine). remquo handles large arguments. */
+static inline @ftype@
+sinpi_remainder@c@(@ftype@ x, @ftype@ period, int *quotient)
+{
+    /* Leave room for twice x when reducing to half-integers. */
+    if (npy_isfinite(x) && npy_fabs@c@(x) < INT_MAX / 4) {
+        @ftype@ t = x / period;
+        *quotient = (int)(t + npy_copysign@c@(0.5@c@, t));
+        @ftype@ r = x - *quotient * period;
+        return r == 0 ? npy_copysign@c@(0, x) : r;
+    }
+    return remquo@c@(x, period, quotient);
+}
+
+NPY_NO_EXPORT @ftype@
+npy_sinc@c@(@ftype@ x)
+{
+    if (!npy_isfinite(x)) {
+        return x - x;
+    }
+    if (npy_fabs@c@(x) <= @eps@) {
+        return 1;
+    }
+    int n = 0;
+    @ftype@ r = sinpi_remainder@c@(x, 1, &n);
+    if (r == 0) {
+        return 0;
+    }
+    @ftype@ sinpi = (1 - 2 * (n & 1)) * npy_sin@c@(NPY_PI@c@ * r);
+    return sinpi / (NPY_PI@c@ * x);
+}
+
+static void
+nc_sinc@c@(@ctype@ *z, @ctype@ *out)
+{
+    @ftype@ x = npy_creal@c@(*z), y = npy_cimag@c@(*z);
+    if (y == 0 && npy_isfinite(x)) {
+        *out = npy_cpack@c@(npy_sinc@c@(x), 0);
+        return;
+    }
+
+    /* Near zero the real part rounds to one. Use the quadratic term for
+     * the imaginary part to avoid cancellation in the complex division. */
+    if (npy_fabs@c@(x) <= @eps@ && npy_fabs@c@(y) <= @eps@) {
+        @ftype@ im = npy_copysign@c@(0, y);
+        if (x != 0 && (npy_fabs@c@(x) >= @tiny@ || npy_fabs@c@(y) >= @tiny@)) {
+            im = -(NPY_PI@c@ * NPY_PI@c@ / 3) * x * y;
+        }
+        *out = npy_cpack@c@(1, im);
+        return;
+    }
+
+    /* Use the complementary cosine near half-integers to keep both
+     * components of sin(pi*z) accurate. */
+    int quadrant = 0;
+    @ftype@ r = sinpi_remainder@c@(x, 0.5@c@, &quadrant);
+    @ftype@ b, gain = 1;
+    int exponent = 0;
+    const @ftype@ limit = (@max_exp@ - 1) * NPY_LOGE2@c@;
+    if (npy_fabs@c@(y) > limit / NPY_PI@c@ && npy_isfinite(y) && npy_isfinite(x)) {
+        /* Here sinh(b/4) and cosh(b/4) equal their leading exponential to
+         * working precision. Restore exp(3*abs(b)/4) after division,
+         * carrying its exponent separately so either component can overflow
+         * without losing the other one. */
+        b = npy_copysign@c@(fmin@c@(npy_fabs@c@(y) * (NPY_PI@c@ / 4), limit), y);
+        int h_exp, z_exp;
+        @ftype@ h = npy_frexp@c@(npy_exp@c@(npy_fabs@c@(b)), &h_exp);
+        @ftype@ scale = fmax@c@(npy_fabs@c@(x), npy_fabs@c@(y));
+        @ftype@ m = npy_frexp@c@(scale, &z_exp);
+        x /= scale;
+        y /= scale;
+        gain = h * h * h / m;
+        exponent = 3 * h_exp - z_exp;
+    }
+    else {
+        b = NPY_PI@c@ * y;
+    }
+    @ctype@ angle = npy_cpack@c@(NPY_PI@c@ * r, b);
+    @ctype@ num = (quadrant & 1) ? npy_ccos@c@(angle) : npy_csin@c@(angle);
+    @ftype@ pi = (quadrant & 2) ? -NPY_PI@c@ : NPY_PI@c@;
+
+    /* Scale before forming the dot products, including for subnormal z.
+     * Restore the sign of the dominant component in the final multiply. */
+    @ftype@ scale = npy_fabs@c@(x) >= npy_fabs@c@(y) ? x : y;
+    @ftype@ re = x / scale, im = y / scale;
+    @ftype@ abs_scale = npy_fabs@c@(scale);
+    @ftype@ ar = (npy_creal@c@(num) / pi) / abs_scale;
+    @ftype@ ai = (npy_cimag@c@(num) / pi) / abs_scale;
+    @ftype@ factor = npy_copysign@c@(1, scale) / (re * re + im * im);
+    *out = npy_cpack@c@((ar * re + ai * im) * factor, (ai * re - ar * im) * factor);
+    if (exponent != 0 || gain != 1) {
+        npy_csetreal@c@(out, npy_ldexp@c@(npy_creal@c@(*out) * gain, exponent));
+        npy_csetimag@c@(out, npy_ldexp@c@(npy_cimag@c@(*out) * gain, exponent));
+    }
+}
+/**end repeat**/
 
 /*
  *****************************************************************************

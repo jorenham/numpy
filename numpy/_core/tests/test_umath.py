@@ -1930,7 +1930,7 @@ class TestSpecialFloats:
 
     # test to ensure no spurious FP exceptions are raised due to SIMD
     INF_INVALID_ERR = [
-        np.cos, np.sin, np.tan, np.arccos, np.arcsin, np.spacing, np.arctanh
+        np.cos, np.sin, np.sinc, np.tan, np.arccos, np.arcsin, np.spacing, np.arctanh
     ]
     NEG_INVALID_ERR = [
         np.log, np.log2, np.log10, np.log1p, np.sqrt, np.arccosh,
